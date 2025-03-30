@@ -10,15 +10,45 @@ from preswald.engine.service import PreswaldService
 logger = logging.getLogger(__name__)
 
 
-def connect():
+def connect(headless=False):
     """
-    Connect to all listed data sources in preswald.toml
+    Connect to the Preswald service or set up headless mode.
+    
+    Args:
+        headless (bool): If True, enables headless mode (console output without server)
     """
+    if headless:
+        import os
+        os.environ["PRESWALD_HEADLESS"] = "1"
+        print("[Preswald] Running in headless mode (console output)")
+    
     try:
-        service = PreswaldService.get_instance()
+        import os
+        from preswald.engine.service import PreswaldService
+        
+        # For headless mode, we need to initialize with the script path
+        if os.environ.get("PRESWALD_HEADLESS") == "1":
+            script_path = os.environ.get("PRESWALD_SCRIPT_PATH")
+            if script_path:
+                service = PreswaldService.initialize(script_path)
+            else:
+                # Try to detect the calling script
+                import inspect
+                frame = inspect.currentframe()
+                try:
+                    caller_file = frame.f_back.f_globals.get('__file__')
+                    if caller_file:
+                        service = PreswaldService.initialize(os.path.abspath(caller_file))
+                    else:
+                        service = PreswaldService.get_instance()
+                finally:
+                    del frame
+        else:
+            # Normal mode - get existing instance
+            service = PreswaldService.get_instance()
+            
         source_names, duckdb_conn = service.data_manager.connect()
         logger.info(f"Successfully connected to data sources: {source_names}")
-        # TODO: bug - getting duplicated if there are multiple clients
         return duckdb_conn
     except Exception as e:
         logger.error(f"Error connecting to datasources: {e}")

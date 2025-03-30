@@ -24,6 +24,37 @@ def read_port_from_config(config_path: str, port: int):
     except Exception as e:
         print(f"Warning: Could not load port config from {config_path}: {e}")
 
+def detect_script_execution():
+    """
+    Auto-detect when a Preswald script is run directly with python script.py
+    Sets the PRESWALD_HEADLESS environment variable if appropriate.
+    """
+    import os
+    import inspect
+    import sys
+    
+    # Skip if already explicitly set
+    if os.environ.get("PRESWALD_HEADLESS") is not None:
+        return
+        
+    # Find the main module's file
+    frame = inspect.currentframe()
+    try:
+        while frame:
+            if frame.f_globals.get('__name__') == '__main__':
+                main_file = frame.f_globals.get('__file__')
+                # If we're not being run through the CLI or server modules, enable headless mode
+                if main_file and not any(cmd in main_file for cmd in ['cli.py', 'main.py']):
+                    os.environ["PRESWALD_HEADLESS"] = "1"
+                    # Store the script path for service initialization
+                    os.environ["PRESWALD_SCRIPT_PATH"] = os.path.abspath(main_file)
+                    break
+            frame = frame.f_back
+    finally:
+        del frame  # Avoid reference cycles
+
+# Run the detection when this module is imported
+detect_script_execution()
 
 def configure_logging(config_path: Optional[str] = None, level: Optional[str] = None):
     """

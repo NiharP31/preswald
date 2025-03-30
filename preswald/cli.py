@@ -102,12 +102,21 @@ def init(name):
     default=False,
     help="Disable automatically opening a new browser tab",
 )
-def run(port, log_level, disable_new_tab):
+@click.option(
+    "--headless",
+    is_flag=True,
+    default=False,
+    help="Run in headless mode without starting a server",
+)
+def run(port, log_level, disable_new_tab, headless):
     """
     Run a Preswald app from the current directory.
 
     Looks for preswald.toml in the current directory and runs the script specified in the entrypoint.
     """
+    if headless:
+        os.environ["PRESWALD_HEADLESS"] = "1"
+
     config_path = "preswald.toml"
     if not os.path.exists(config_path):
         click.echo("Error: preswald.toml not found in current directory. ❌")
@@ -148,22 +157,31 @@ def run(port, log_level, disable_new_tab):
             "port": port,
             "log_level": log_level,
             "disable_new_tab": disable_new_tab,
+            "headless": headless,
         },
     )
 
-    url = f"http://localhost:{port}"
-    click.echo(f"Running '{script}' on {url} with log level {log_level}  🎉!")
+    # Set headless env variable if flag is used
+    if headless:
+        click.echo(f"Running '{script}' in headless mode with log level {log_level} 🎉!")
+    
+        # for headless mode, we directly execute the script
+        import runpy
+        runpy.run_path(script)
+    else:
+        url = f"http://localhost:{port}"
+        click.echo(f"Running '{script}' on {url} with log level {log_level}  🎉!")
 
-    try:
-        if not disable_new_tab:
-            import webbrowser
+        try:
+            if not disable_new_tab:
+                import webbrowser
 
-            webbrowser.open(url)
+                webbrowser.open(url)
 
-        start_server(script=script, port=port)
+            start_server(script=script, port=port)
 
-    except Exception as e:
-        click.echo(f"Error: {e}")
+        except Exception as e:
+            click.echo(f"Error: {e}")
 
 
 @cli.command()
